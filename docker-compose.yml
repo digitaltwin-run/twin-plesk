@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  twin-plesk-web:
+    image: nginx:alpine
+    container_name: twin-plesk-web
+    ports:
+      - "19095:80"
+    volumes:
+      - ./vhost-config/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./vhost-docroot:/var/www/vhosts/default/httpdocs:rw
+    depends_on:
+      - twin-plesk-php
+
+  twin-plesk-php:
+    image: php:8.3-fpm-alpine
+    container_name: twin-plesk-php
+    volumes:
+      - ./vhost-docroot:/var/www/vhosts/default/httpdocs:rw

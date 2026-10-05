@@ -1,0 +1,145 @@
+{
+  "schema": "subactor.doql-situation-profile/v1",
+  "id": "public-site.capability-inventory",
+  "version": 1,
+  "status": "active",
+  "subject": {
+    "kind": "system",
+    "ref": "system:plesk-connector"
+  },
+  "sources": [
+    {
+      "id": "inventory",
+      "snapshot_path": "inventory_rows",
+      "source_ref": "snapshot:plesk/capability-inventory",
+      "object_type": "capability",
+      "required": true,
+      "max_objects": 200
+    }
+  ],
+  "metrics": [
+    {"id": "capability_count", "operation": "count", "source": "inventory"},
+    {
+      "id": "available_count",
+      "operation": "count_where",
+      "source": "inventory",
+      "where": "item.available == true"
+    },
+    {
+      "id": "dns_capability_available_count",
+      "operation": "count_where",
+      "source": "inventory",
+      "where": "item.available == true and item.role_dns == true"
+    },
+    {
+      "id": "tls_capability_available_count",
+      "operation": "count_where",
+      "source": "inventory",
+      "where": "item.available == true and item.role_tls == true"
+    },
+    {
+      "id": "domain_capability_available_count",
+      "operation": "count_where",
+      "source": "inventory",
+      "where": "item.available == true and item.role_domain == true"
+    },
+    {
+      "id": "content_capability_available_count",
+      "operation": "count_where",
+      "source": "inventory",
+      "where": "item.available == true and item.role_content == true"
+    },
+    {
+      "id": "cloudflaredns_signal_count",
+      "operation": "count_where",
+      "source": "inventory",
+      "where": "item.cloudflaredns_present == true"
+    },
+    {
+      "id": "availability_ratio",
+      "operation": "ratio",
+      "numerator": "available_count",
+      "denominator": "capability_count",
+      "precision": 4
+    }
+  ],
+  "assessments": [
+    {
+      "id": "inventory_coverage",
+      "rules": [
+        {"when": "metrics.availability_ratio >= 0.5", "value": "usable", "priority": 100},
+        {"when": "metrics.available_count > 0", "value": "partial", "priority": 50},
+        {"when": "metrics.capability_count >= 0", "value": "empty", "priority": 0}
+      ]
+    },
+    {
+      "id": "dns_playbook_ready",
+      "rules": [
+        {"when": "metrics.dns_capability_available_count > 0 and metrics.cloudflaredns_signal_count > 0", "value": "ready_plesk_cloudflaredns", "priority": 100},
+        {"when": "metrics.dns_capability_available_count > 0", "value": "dns_uris_known", "priority": 50},
+        {"when": "metrics.capability_count >= 0", "value": "dns_unknown", "priority": 0}
+      ]
+    },
+    {
+      "id": "tls_playbook_ready",
+      "rules": [
+        {"when": "metrics.tls_capability_available_count > 0", "value": "ready", "priority": 100},
+        {"when": "metrics.capability_count >= 0", "value": "unknown", "priority": 0}
+      ]
+    },
+    {
+      "id": "bootstrap_playbook_ready",
+      "rules": [
+        {
+          "when": "metrics.domain_capability_available_count > 0 and metrics.dns_capability_available_count > 0 and metrics.tls_capability_available_count > 0 and metrics.content_capability_available_count > 0",
+          "value": "ready",
+          "priority": 100
+        },
+        {
+          "when": "metrics.available_count > 0",
+          "value": "partial",
+          "priority": 50
+        },
+        {"when": "metrics.capability_count >= 0", "value": "not_ready", "priority": 0}
+      ]
+    }
+  ],
+  "decision_candidates": [
+    {
+      "id": "run_public_site_bootstrap",
+      "title": "Run Plesk public-site bootstrap playbook (inventory → domain → DNS → TLS → content)",
+      "when": "situation.assessments.bootstrap_playbook_ready == \"ready\"",
+      "owner": "bot:project-operator-bot",
+      "strategy_ref": "strategy:project.public-site.bootstrap.plesk-origin/v1",
+      "eql_ref": "eql:public-site-bootstrap-inventory-ready/v1",
+      "evidence_refs": [
+        "snapshot:plesk/capability-inventory",
+        "knowledge:architecture.digital-twin.public-site-service-map/v1"
+      ]
+    },
+    {
+      "id": "refresh_plesk_doctor",
+      "title": "Refresh live Plesk doctor report — inventory incomplete",
+      "when": "situation.assessments.inventory_coverage == \"empty\" or situation.assessments.inventory_coverage == \"partial\"",
+      "owner": "bot:project-operator-bot",
+      "strategy_ref": "strategy:project.public-site.bootstrap.plesk-origin/v1",
+      "eql_ref": "eql:plesk-doctor-fresh/v1",
+      "evidence_refs": ["snapshot:plesk/capability-inventory"]
+    }
+  ],
+  "policy": {
+    "read_only": true,
+    "automatic_mutation_allowed": false,
+    "include_raw_objects": false,
+    "max_total_objects": 200,
+    "max_decision_candidates": 10
+  },
+  "provenance": {
+    "created_by": "bot:architecture-bot",
+    "created_at": "2026-07-24T17:00:00.000Z",
+    "knowledge_refs": [
+      "knowledge://subactor/architecture.digital-twin.public-site-service-map/v4",
+      "knowledge://subactor/ops.plesk.cloudflare-dns-management/v1"
+    ]
+  }
+}

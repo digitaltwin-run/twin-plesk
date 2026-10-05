@@ -1,0 +1,142 @@
+{
+  "schema": "subactor.doql-situation-profile/v1",
+  "id": "public-site.service-map",
+  "version": 1,
+  "status": "active",
+  "subject": {
+    "kind": "portfolio",
+    "ref": "portfolio:public-sites"
+  },
+  "sources": [
+    {
+      "id": "projects",
+      "snapshot_path": "projects",
+      "source_ref": "snapshot:projects/project-manifests",
+      "object_type": "project",
+      "required": true,
+      "max_objects": 100
+    }
+  ],
+  "metrics": [
+    {"id": "project_count", "operation": "count", "source": "projects"},
+    {
+      "id": "dns_plesk_cloudflaredns_count",
+      "operation": "count_where",
+      "source": "projects",
+      "where": "item.dns_management_plane == \"plesk\" and item.dns_sync_extension == \"cloudflaredns\""
+    },
+    {
+      "id": "ingress_plesk_public_origin_count",
+      "operation": "count_where",
+      "source": "projects",
+      "where": "item.public_ingress_mode == \"plesk_public_origin\""
+    },
+    {
+      "id": "tunnel_none_count",
+      "operation": "count_where",
+      "source": "projects",
+      "where": "item.tunnel_mode == \"none\""
+    },
+    {
+      "id": "tunnel_required_conflict_count",
+      "operation": "count_where",
+      "source": "projects",
+      "where": "item.tunnel_mode == \"none\" and item.public_ingress_mode == \"managed_outbound_tunnel\""
+    },
+    {
+      "id": "founder_site_binding_count",
+      "operation": "count_where",
+      "source": "projects",
+      "where": "item.id == \"founder-subactor-com\" and item.dns_management_plane == \"plesk\" and item.dns_sync_extension == \"cloudflaredns\" and item.public_ingress_mode == \"plesk_public_origin\" and item.tunnel_mode == \"none\""
+    },
+    {
+      "id": "dns_plane_coverage_ratio",
+      "operation": "ratio",
+      "numerator": "dns_plesk_cloudflaredns_count",
+      "denominator": "project_count",
+      "precision": 4
+    }
+  ],
+  "assessments": [
+    {
+      "id": "dns_management_binding",
+      "rules": [
+        {"when": "metrics.dns_plesk_cloudflaredns_count == metrics.project_count", "value": "plesk_cloudflaredns_complete", "priority": 100},
+        {"when": "metrics.dns_plesk_cloudflaredns_count > 0", "value": "plesk_cloudflaredns_partial", "priority": 50},
+        {"when": "metrics.project_count >= 0", "value": "dns_binding_missing", "priority": 0}
+      ]
+    },
+    {
+      "id": "tunnel_policy",
+      "rules": [
+        {"when": "metrics.tunnel_required_conflict_count == 0", "value": "consistent", "priority": 100},
+        {"when": "metrics.tunnel_required_conflict_count > 0", "value": "conflict", "priority": 90}
+      ]
+    },
+    {
+      "id": "founder_public_site_binding",
+      "rules": [
+        {"when": "metrics.founder_site_binding_count == 1", "value": "selected_plesk_public_origin", "priority": 100},
+        {"when": "metrics.founder_site_binding_count == 0", "value": "missing_or_divergent", "priority": 0}
+      ]
+    },
+    {
+      "id": "index_page_shadowing_policy",
+      "rules": [
+        {"when": "metrics.project_count >= 0", "value": "enforce_index_php_over_default_html", "priority": 100}
+      ]
+    }
+  ],
+  "decision_candidates": [
+    {
+      "id": "clean_plesk_default_placeholders",
+      "title": "Purge default Plesk index.html placeholder to enforce root index.php execution",
+      "when": "situation.assessments.index_page_shadowing_policy == \"enforce_index_php_over_default_html\"",
+      "owner": "bot:project-operator-bot",
+      "strategy_ref": "strategy:project.public-site.purge-default-placeholders/v1",
+      "eql_ref": "eql:public-site-clean-default-html/v1",
+      "evidence_refs": [
+        "snapshot:projects/project-manifests",
+        "knowledge:architecture.digital-twin.public-site-service-map/v10"
+      ]
+    },
+    {
+      "id": "restore_founder_plesk_binding",
+      "title": "Restore founder.subactor.com Plesk public-origin binding without managed tunnel",
+      "when": "situation.assessments.founder_public_site_binding == \"missing_or_divergent\"",
+      "owner": "human:founder",
+      "strategy_ref": "strategy:project.application.route.plesk-origin/v1",
+      "eql_ref": "eql:public-site-tunnel-mode-none/v1",
+      "evidence_refs": [
+        "snapshot:projects/project-manifests",
+        "knowledge:ops.plesk.cloudflare-dns-management/v1",
+        "artifact:platform/config/intent-contracts/founder-public-site-binding.v1.json"
+      ]
+    },
+    {
+      "id": "resolve_tunnel_policy_conflict",
+      "title": "Resolve conflicting tunnel_mode and public_ingress_mode declarations",
+      "when": "situation.assessments.tunnel_policy == \"conflict\"",
+      "owner": "bot:architecture-bot",
+      "strategy_ref": "strategy:public-site.binding.reconcile/v1",
+      "eql_ref": "eql:public-site-binding-xor/v1",
+      "evidence_refs": ["snapshot:projects/project-manifests"]
+    }
+  ],
+  "policy": {
+    "read_only": true,
+    "automatic_mutation_allowed": false,
+    "include_raw_objects": false,
+    "max_total_objects": 100,
+    "max_decision_candidates": 10
+  },
+  "provenance": {
+    "created_by": "bot:architecture-bot",
+    "created_at": "2026-07-24T16:35:00.000Z",
+    "knowledge_refs": [
+      "knowledge://subactor/architecture.doql-digital-twin-situation/v2",
+      "knowledge://subactor/architecture.digital-twin.public-site-service-map/v4",
+      "knowledge://subactor/ops.plesk.cloudflare-dns-management/v1"
+    ]
+  }
+}

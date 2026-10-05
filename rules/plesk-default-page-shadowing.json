@@ -1,0 +1,17 @@
+{
+  "schema": "subactor.digital-twin-rule/v1",
+  "id": "twin-plesk-default-page-shadowing",
+  "version": 1,
+  "kind": "connector_validation_rule",
+  "target": "plesk_virtual_host",
+  "rule": {
+    "name": "plesk_default_page_shadowing",
+    "description": "Detects if Plesk default index.html is shadowing index.php application entrypoint",
+    "patterns": [
+      "Domain Default page",
+      "default-website-index.js",
+      "Plesk is a <a href=\"https://www.plesk.com\""
+    ],
+    "action": "flag_unhealthy_and_purge"
+  }
+}

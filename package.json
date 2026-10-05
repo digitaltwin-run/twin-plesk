@@ -1,0 +1,20 @@
+{
+  "name": "@subactor/twin-plesk",
+  "version": "1.0.0",
+  "description": "Digital Twin Docker simulation environment, connector rules and pre-deploy smoke test for Plesk",
+  "type": "module",
+  "main": "src/index.mjs",
+  "scripts": {
+    "test": "node src/index.mjs --test && node --test test/*.test.mjs",
+    "smoke": "node src/index.mjs --smoke"
+  },
+  "keywords": [
+    "subactor",
+    "digital-twin",
+    "plesk",
+    "docker",
+    "smoke-test"
+  ],
+  "author": "Subactor Platform Team",
+  "license": "UNLICENSED"
+}
